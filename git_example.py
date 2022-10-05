@@ -9,6 +9,7 @@ This file is used for Git training.
 
 def main():
     print("Raiden's Windows has built the connection!")
+    print('Catherine has been here.')
     return
 
 
