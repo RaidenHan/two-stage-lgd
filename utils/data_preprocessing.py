@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from datetime import date, timedelta
+
 import pandas as pd
 
 
 def read_loan_csv(filepath, **kwargs):
     """ Read the Fannie Mae single-family loan data with header
 
-    @author: Raiden Han
+    @author: Raiden
 
     Parameters
     ----------
@@ -109,6 +111,8 @@ def find_default_data(df, disp_date=None, states=None):
     """ Find default data without repurchase and with a disposition date before
     a certain date
 
+    @author: Abhilash, Raiden
+
     Parameters
     ----------
     df : DataFrame
@@ -126,11 +130,30 @@ def find_default_data(df, disp_date=None, states=None):
 
     """
 
-    pass
+    # Set disp_date's default value
+    if disp_date is None:
+        today = date.today()
+        disp_date = today - timedelta(days=365)
+        disp_date = disp_date.strftime('%Y-%m-%d')
+    # Set states' default value
+    if states is None:
+        states = []
+    # Set a list for default loans' zero balance codes
+    default_code = ['02', '03', '09']
+    # Subset the DataFrame
+    subset = df.loc[(df['Zero_Bal_Code'].isin(default_code)) &
+                    (df['RE_PROCS_FLAG'] == 'N') &
+                    (df["DISPOSITION_DATE"] < disp_date), :]
+    if states:
+        subset = subset.loc[subset.isin(states), :]
+
+    return subset
 
 
 def calculate_lgd(df):
     """ Calculate loss given default
+
+    @author: Abhilash
 
     Parameters
     ----------
@@ -144,4 +167,19 @@ def calculate_lgd(df):
 
     """
 
-    pass
+    df_new = df.copy()
+    # Calculate total costs and total proceeds
+    total_costs = (df["FORECLOSURE_COSTS"] +
+                   df["PROPERTY_PRESERVATION_AND_REPAIR_COSTS"] +
+                   df["ASSET_RECOVERY_COSTS"] +
+                   df["MISCELLANEOUS_HOLDING_EXPENSES_AND_CREDITS"] +
+                   df["ASSOCIATED_TAXES_FOR_HOLDING_PROPERTY"])
+    total_proceeds = (df["NET_SALES_PROCEEDS"] +
+                      df["CREDIT_ENHANCEMENT_PROCEEDS"] +
+                      df["REPURCHASES_MAKE_WHOLE_PROCEEDS"] +
+                      df["OTHER_FORECLOSURE_PROCEEDS"])
+    # Calculate LGD
+    df_new['LGD'] = df_new["CURRENT_UPB"] + df_new[
+        "DELINQUENT_ACCRUED_INTEREST"] + total_costs - total_proceeds
+
+    return df_new
