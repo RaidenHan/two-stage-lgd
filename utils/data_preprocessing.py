@@ -169,18 +169,20 @@ def calculate_lgd(df):
 
     df_new = df.copy()
     # Calculate total costs and total proceeds
+    delinquent_accrued_interest = df['LAST_UPB']*((df['ORIG_RATE']/100-0.0035)/12)*np.round((df['DISPOSITION_DATE'] - df['ACT_PERIOD'])/np.timedelta64(1, 'M'))
+
     total_costs = (df["FORECLOSURE_COSTS"] +
                    df["PROPERTY_PRESERVATION_AND_REPAIR_COSTS"] +
                    df["ASSET_RECOVERY_COSTS"] +
                    df["MISCELLANEOUS_HOLDING_EXPENSES_AND_CREDITS"] +
                    df["ASSOCIATED_TAXES_FOR_HOLDING_PROPERTY"])
+
     total_proceeds = (df["NET_SALES_PROCEEDS"] +
                       df["CREDIT_ENHANCEMENT_PROCEEDS"] +
                       df["REPURCHASES_MAKE_WHOLE_PROCEEDS"] +
                       df["OTHER_FORECLOSURE_PROCEEDS"])
     # Calculate LGD
-    total_net_loss = (df_new["LAST_UPB"] + df_new[
-        "DELINQUENT_ACCRUED_INTEREST"] + total_costs - total_proceeds)
+    total_net_loss = (df_new["LAST_UPB"] + delinquent_accrued_interest + total_costs - total_proceeds)
 
     df_new['LGD'] = total_net_loss / df_new['LAST_UPB']
 
