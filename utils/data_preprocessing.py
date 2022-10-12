@@ -179,7 +179,9 @@ def calculate_lgd(df):
                       df["REPURCHASES_MAKE_WHOLE_PROCEEDS"] +
                       df["OTHER_FORECLOSURE_PROCEEDS"])
     # Calculate LGD
-    df_new['LGD'] = df_new["CURRENT_UPB"] + df_new[
-        "DELINQUENT_ACCRUED_INTEREST"] + total_costs - total_proceeds
+    total_net_loss = (df_new["LAST_UPB"] + df_new[
+        "DELINQUENT_ACCRUED_INTEREST"] + total_costs - total_proceeds)
+
+    df_new['LGD'] = total_net_loss / df_new['LAST_UPB']
 
     return df_new
