@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 from datetime import date, timedelta
+from os import listdir
 
+import pandas as pd
 import pyspark.sql.functions as F
 from pyspark.sql.types import *
 
@@ -241,3 +243,27 @@ def calculate_lgd(df):
             df.LOSS_GIVEN_DEFAULT < 0, 0).otherwise(df.LOSS_GIVEN_DEFAULT))
 
     return df
+
+
+def merge_output_files(filepath, destination, **kwargs):
+    """ Combine all csv files output by PySpark into one file
+
+    Parameters
+    ----------
+    filepath : str
+        The output path of PySpark
+    destination : str
+        Path object implementing a write() function
+
+    """
+
+    filenames = listdir(filepath)
+    csv_files = [filepath + '/' + filename
+                 for filename in filenames if filename.endswith('.csv')]
+    df_list = []
+    for csv_file in csv_files:
+        df_list.append(pd.read_csv(csv_file))
+    df = pd.concat(df_list)
+    df.to_csv(destination, **kwargs)
+
+    return
