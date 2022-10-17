@@ -2,107 +2,153 @@
 # -*- coding: utf-8 -*-
 
 from datetime import date, timedelta
+from os import listdir
 
 import pandas as pd
+import pyspark.sql.functions as F
+from pyspark.sql.types import *
 
 
-def read_loan_csv(filepath, **kwargs):
+def read_loan_csv(spark, filepath):
     """ Read the Fannie Mae single-family loan data with header
 
     @author: Raiden
 
     Parameters
     ----------
+    spark : sparkSession
+        User-specified Spark Session
     filepath : str
         Any valid string path is acceptable
 
     Returns
     -------
-    df : DataFrame
+    df : pyspark.sql.DataFrame
         two-dimensional data structure with labeled axes
 
     """
 
-    column_names = ["POOL_ID", "LOAN_ID", "ACT_PERIOD", "CHANNEL", "SELLER",
-                    "SERVICER", "MASTER_SERVICER", "ORIG_RATE", "CURR_RATE",
-                    "ORIG_UPB", "ISSUANCE_UPB", "CURRENT_UPB", "ORIG_TERM",
-                    "ORIG_DATE", "FIRST_PAY", "LOAN_AGE", "REM_MONTHS",
-                    "ADJ_REM_MONTHS", "MATR_DT", "OLTV", "OCLTV", "NUM_BO",
-                    "DTI", "CSCORE_B", "CSCORE_C", "FIRST_FLAG", "PURPOSE",
-                    "PROP", "NO_UNITS", "OCC_STAT", "STATE", "MSA", "ZIP",
-                    "MI_PCT", "PRODUCT", "PPMT_FLG", "IO", "FIRST_PAY_IO",
-                    "MNTHS_TO_AMTZ_IO", "DLQ_STATUS", "PMT_HISTORY",
-                    "MOD_FLAG", "MI_CANCEL_FLAG", "Zero_Bal_Code", "ZB_DTE",
-                    "LAST_UPB", "RPRCH_DTE", "CURR_SCHD_PRNCPL",
-                    "TOT_SCHD_PRNCPL", "UNSCHD_PRNCPL_CURR",
-                    "LAST_PAID_INSTALLMENT_DATE", "FORECLOSURE_DATE",
-                    "DISPOSITION_DATE", "FORECLOSURE_COSTS",
-                    "PROPERTY_PRESERVATION_AND_REPAIR_COSTS",
-                    "ASSET_RECOVERY_COSTS",
-                    "MISCELLANEOUS_HOLDING_EXPENSES_AND_CREDITS",
-                    "ASSOCIATED_TAXES_FOR_HOLDING_PROPERTY",
-                    "NET_SALES_PROCEEDS", "CREDIT_ENHANCEMENT_PROCEEDS",
-                    "REPURCHASES_MAKE_WHOLE_PROCEEDS",
-                    "OTHER_FORECLOSURE_PROCEEDS", "NON_INTEREST_BEARING_UPB",
-                    "PRINCIPAL_FORGIVENESS_AMOUNT", "ORIGINAL_LIST_START_DATE",
-                    "ORIGINAL_LIST_PRICE", "CURRENT_LIST_START_DATE",
-                    "CURRENT_LIST_PRICE", "ISSUE_SCOREB", "ISSUE_SCOREC",
-                    "CURR_SCOREB", "CURR_SCOREC", "MI_TYPE", "SERV_IND",
-                    "CURRENT_PERIOD_MODIFICATION_LOSS_AMOUNT",
-                    "CUMULATIVE_MODIFICATION_LOSS_AMOUNT",
-                    "CURRENT_PERIOD_CREDIT_EVENT_NET_GAIN_OR_LOSS",
-                    "CUMULATIVE_CREDIT_EVENT_NET_GAIN_OR_LOSS",
-                    "HOMEREADY_PROGRAM_INDICATOR",
-                    "FORECLOSURE_PRINCIPAL_WRITE_OFF_AMOUNT",
-                    "RELOCATION_MORTGAGE_INDICATOR",
-                    "ZERO_BALANCE_CODE_CHANGE_DATE", "LOAN_HOLDBACK_INDICATOR",
-                    "LOAN_HOLDBACK_EFFECTIVE_DATE",
-                    "DELINQUENT_ACCRUED_INTEREST",
-                    "PROPERTY_INSPECTION_WAIVER_INDICATOR",
-                    "HIGH_BALANCE_LOAN_INDICATOR", "ARM_5_YR_INDICATOR",
-                    "ARM_PRODUCT_TYPE", "MONTHS_UNTIL_FIRST_PAYMENT_RESET",
-                    "MONTHS_BETWEEN_SUBSEQUENT_PAYMENT_RESET",
-                    "INTEREST_RATE_CHANGE_DATE", "PAYMENT_CHANGE_DATE",
-                    "ARM_INDEX", "ARM_CAP_STRUCTURE",
-                    "INITIAL_INTEREST_RATE_CAP", "PERIODIC_INTEREST_RATE_CAP",
-                    "LIFETIME_INTEREST_RATE_CAP", "MARGIN",
-                    "BALLOON_INDICATOR", "PLAN_NUMBER",
-                    "FORBEARANCE_INDICATOR",
-                    "HIGH_LOAN_TO_VALUE_HLTV_REFINANCE_OPTION_INDICATOR",
-                    "DEAL_NAME", "RE_PROCS_FLAG", "ADR_TYPE", "ADR_COUNT",
-                    "ADR_UPB"]
-    column_types = ["string", "string", "string", "category", "string",
-                    "string", "string", "float32", "float32", "float32",
-                    "float32", "float32", "Int64", "string", "string",
-                    "Int64", "Int64", "Int64", "string", "Int64", "Int64",
-                    "Int64", "Int64", "Int64", "Int64", "category", "category",
-                    "category", "Int64", "category", "category", "string",
-                    "string", "float32", "category", "category", "category",
-                    "string", "Int64", "string", "string", "category",
-                    "category", "category", "string", "float32", "string",
-                    "float32", "float32", "float32", "string", "string",
-                    "string", "float32", "float32", "float32", "float32",
-                    "float32", "float32", "float32", "float32", "float32",
-                    "float32", "float32", "string", "float32", "string",
-                    "float32", "Int64", "Int64", "Int64", "Int64", "category",
-                    "category", "float32", "float32", "float32", "float32",
-                    "category", "float32", "category", "string", "category",
-                    "string", "float32", "category", "category", "category",
-                    "string", "Int64", "Int64", "string", "string", "string",
-                    "string", "float32", "float32", "float32", "float32",
-                    "category", "string", "category", "category", "string",
-                    "category", "category", "Int64", "float"]
-    column_types = dict(zip(column_names, column_types))
-    date_col = ["ACT_PERIOD", "ORIG_DATE", "FIRST_PAY", "MATR_DT",
-                "FIRST_PAY_IO", "ZB_DTE", "RPRCH_DTE",
-                "LAST_PAID_INSTALLMENT_DATE", "FORECLOSURE_DATE",
-                "DISPOSITION_DATE", "ORIGINAL_LIST_START_DATE",
-                "CURRENT_LIST_START_DATE", "ZERO_BALANCE_CODE_CHANGE_DATE",
-                "LOAN_HOLDBACK_EFFECTIVE_DATE", "INTEREST_RATE_CHANGE_DATE",
-                "PAYMENT_CHANGE_DATE"]
-    date_parser = lambda x: pd.to_datetime(x, format="%m%Y", errors='coerce')
-    df = pd.read_csv(filepath, sep="|", names=column_names, dtype=column_types,
-                     parse_dates=date_col, date_parser=date_parser, **kwargs)
+    schema = StructType([
+        StructField("POOL_ID", StringType(), True),
+        StructField("LOAN_ID", StringType(), True),
+        StructField("ACT_PERIOD", DateType(), True),
+        StructField("CHANNEL", StringType(), True),
+        StructField("SELLER", StringType(), True),
+        StructField("SERVICER", StringType(), True),
+        StructField("MASTER_SERVICER", StringType(), True),
+        StructField("ORIG_RATE", FloatType(), True),
+        StructField("CURR_RATE", FloatType(), True),
+        StructField("ORIG_UPB", FloatType(), True),
+        StructField("ISSUANCE_UPB", FloatType(), True),
+        StructField("CURRENT_UPB", FloatType(), True),
+        StructField("ORIG_TERM", ShortType(), True),
+        StructField("ORIG_DATE", DateType(), True),
+        StructField("FIRST_PAY", DateType(), True),
+        StructField("LOAN_AGE", ShortType(), True),
+        StructField("REM_MONTHS", ShortType(), True),
+        StructField("ADJ_REM_MONTHS", ShortType(), True),
+        StructField("MATR_DT", DateType(), True),
+        StructField("OLTV", ShortType(), True),
+        StructField("OCLTV", ShortType(), True),
+        StructField("NUM_BO", ByteType(), True),
+        StructField("DTI", ByteType(), True),
+        StructField("CSCORE_B", ShortType(), True),
+        StructField("CSCORE_C", ShortType(), True),
+        StructField("FIRST_FLAG", StringType(), True),
+        StructField("PURPOSE", StringType(), True),
+        StructField("PROP", StringType(), True),
+        StructField("NO_UNITS", ByteType(), True),
+        StructField("OCC_STAT", StringType(), True),
+        StructField("STATE", StringType(), True),
+        StructField("MSA", StringType(), True),
+        StructField("ZIP", StringType(), True),
+        StructField("MI_PCT", FloatType(), True),
+        StructField("PRODUCT", StringType(), True),
+        StructField("PPMT_FLG", StringType(), True),
+        StructField("IO", StringType(), True),
+        StructField("FIRST_PAY_IO", DateType(), True),
+        StructField("MNTHS_TO_AMTZ_IO", ShortType(), True),
+        StructField("DLQ_STATUS", StringType(), True),
+        StructField("PMT_HISTORY", StringType(), True),
+        StructField("MOD_FLAG", StringType(), True),
+        StructField("MI_CANCEL_FLAG", StringType(), True),
+        StructField("Zero_Bal_Code", StringType(), True),
+        StructField("ZB_DTE", DateType(), True),
+        StructField("LAST_UPB", FloatType(), True),
+        StructField("RPRCH_DTE", DateType(), True),
+        StructField("CURR_SCHD_PRNCPL", FloatType(), True),
+        StructField("TOT_SCHD_PRNCPL", FloatType(), True),
+        StructField("UNSCHD_PRNCPL_CURR", FloatType(), True),
+        StructField("LAST_PAID_INSTALLMENT_DATE", DateType(), True),
+        StructField("FORECLOSURE_DATE", DateType(), True),
+        StructField("DISPOSITION_DATE", DateType(), True),
+        StructField("FORECLOSURE_COSTS", FloatType(), True),
+        StructField("PROPERTY_PRESERVATION_AND_REPAIR_COSTS",
+                    FloatType(), True),
+        StructField("ASSET_RECOVERY_COSTS", FloatType(), True),
+        StructField("MISCELLANEOUS_HOLDING_EXPENSES_AND_CREDITS",
+                    FloatType(), True),
+        StructField("ASSOCIATED_TAXES_FOR_HOLDING_PROPERTY",
+                    FloatType(), True),
+        StructField("NET_SALES_PROCEEDS", FloatType(), True),
+        StructField("CREDIT_ENHANCEMENT_PROCEEDS", FloatType(), True),
+        StructField("REPURCHASES_MAKE_WHOLE_PROCEEDS", FloatType(), True),
+        StructField("OTHER_FORECLOSURE_PROCEEDS", FloatType(), True),
+        StructField("NON_INTEREST_BEARING_UPB", FloatType(), True),
+        StructField("PRINCIPAL_FORGIVENESS_AMOUNT", FloatType(), True),
+        StructField("ORIGINAL_LIST_START_DATE", DateType(), True),
+        StructField("ORIGINAL_LIST_PRICE", FloatType(), True),
+        StructField("CURRENT_LIST_START_DATE", DateType(), True),
+        StructField("CURRENT_LIST_PRICE", FloatType(), True),
+        StructField("ISSUE_SCOREB", ShortType(), True),
+        StructField("ISSUE_SCOREC", ShortType(), True),
+        StructField("CURR_SCOREB", ShortType(), True),
+        StructField("CURR_SCOREC", ShortType(), True),
+        StructField("MI_TYPE", StringType(), True),
+        StructField("SERV_IND", StringType(), True),
+        StructField("CURRENT_PERIOD_MODIFICATION_LOSS_AMOUNT",
+                    FloatType(), True),
+        StructField("CUMULATIVE_MODIFICATION_LOSS_AMOUNT", FloatType(), True),
+        StructField("CURRENT_PERIOD_CREDIT_EVENT_NET_GAIN_OR_LOSS",
+                    FloatType(), True),
+        StructField("CUMULATIVE_CREDIT_EVENT_NET_GAIN_OR_LOSS",
+                    FloatType(), True),
+        StructField("HOMEREADY_PROGRAM_INDICATOR", StringType(), True),
+        StructField("FORECLOSURE_PRINCIPAL_WRITE_OFF_AMOUNT",
+                    FloatType(), True),
+        StructField("RELOCATION_MORTGAGE_INDICATOR", StringType(), True),
+        StructField("ZERO_BALANCE_CODE_CHANGE_DATE", DateType(), True),
+        StructField("LOAN_HOLDBACK_INDICATOR", StringType(), True),
+        StructField("LOAN_HOLDBACK_EFFECTIVE_DATE", DateType(), True),
+        StructField("DELINQUENT_ACCRUED_INTEREST", FloatType(), True),
+        StructField("PROPERTY_INSPECTION_WAIVER_INDICATOR",
+                    StringType(), True),
+        StructField("HIGH_BALANCE_LOAN_INDICATOR", StringType(), True),
+        StructField("ARM_5_YR_INDICATOR", StringType(), True),
+        StructField("ARM_PRODUCT_TYPE", StringType(), True),
+        StructField("MONTHS_UNTIL_FIRST_PAYMENT_RESET", ShortType(), True),
+        StructField("MONTHS_BETWEEN_SUBSEQUENT_PAYMENT_RESET",
+                    ShortType(), True),
+        StructField("INTEREST_RATE_CHANGE_DATE", DateType(), True),
+        StructField("PAYMENT_CHANGE_DATE", DateType(), True),
+        StructField("ARM_INDEX", StringType(), True),
+        StructField("ARM_CAP_STRUCTURE", StringType(), True),
+        StructField("INITIAL_INTEREST_RATE_CAP", FloatType(), True),
+        StructField("PERIODIC_INTEREST_RATE_CAP", FloatType(), True),
+        StructField("LIFETIME_INTEREST_RATE_CAP", FloatType(), True),
+        StructField("MARGIN", FloatType(), True),
+        StructField("BALLOON_INDICATOR", StringType(), True),
+        StructField("PLAN_NUMBER", StringType(), True),
+        StructField("FORBEARANCE_INDICATOR", StringType(), True),
+        StructField("HIGH_LOAN_TO_VALUE_HLTV_REFINANCE_OPTION_INDICATOR",
+                    StringType(), True),
+        StructField("DEAL_NAME", StringType(), True),
+        StructField("RE_PROCS_FLAG", StringType(), True),
+        StructField("ADR_TYPE", StringType(), True),
+        StructField("ADR_COUNT", ShortType(), True),
+        StructField("ADR_UPB", FloatType(), True)])
+    df = spark.read.options(
+        sep="|", dateFormat="MMyyyy").schema(schema).csv(filepath)
 
     return df
 
@@ -115,7 +161,7 @@ def find_default_data(df, disp_date=None, states=None):
 
     Parameters
     ----------
-    df : DataFrame
+    df : pyspark.sql.DataFrame
         Single family loan data from Fannie Mae
     disp_date : str or None
         The loan's disposition date should be no later than the disp_date. The
@@ -141,11 +187,11 @@ def find_default_data(df, disp_date=None, states=None):
     # Set a list for default loans' zero balance codes
     default_code = ['02', '03', '09']
     # Subset the DataFrame
-    subset = df.loc[(df['Zero_Bal_Code'].isin(default_code)) &
-                    (df['RE_PROCS_FLAG'] == 'N') &
-                    (df["DISPOSITION_DATE"] < disp_date), :]
+    subset = df.filter(df.Zero_Bal_Code.isin(default_code) &
+                       (df.RE_PROCS_FLAG == 'N') &
+                       (df.DISPOSITION_DATE < disp_date))
     if states:
-        subset = subset.loc[subset.isin(states), :]
+        subset = subset.filter(subset.STATE.isin(states))
 
     return subset
 
@@ -153,37 +199,72 @@ def find_default_data(df, disp_date=None, states=None):
 def calculate_lgd(df):
     """ Calculate loss given default
 
-    @author: Abhilash
+    @author: Abhilash, Catherine, Raiden
 
     Parameters
     ----------
-    df : DataFrame
+    df : pyspark.sql.DataFrame
         Single family loan data from Fannie Mae
 
     Returns
     -------
-    df_new : DataFrame
+    df : pyspark.sql.DataFrame
         Single family loan data from Fannie Mae with loss given default
 
     """
 
-    df_new = df.copy()
     # Calculate total costs and total proceeds
-    delinquent_accrued_interest = df['LAST_UPB']*((df['ORIG_RATE']/100-0.0035)/12)*np.round((df['DISPOSITION_DATE'] - df['ACT_PERIOD'])/np.timedelta64(1, 'M'))
+    df = df.withColumn(
+        "DELINQUENT_ACCRUED_INTEREST",
+        df.LAST_UPB * ((df.ORIG_RATE / 100 - 0.0035) / 12) * F.months_between(
+            df.DISPOSITION_DATE, df.ACT_PERIOD))
+    df = df.withColumn(
+        "TOTAL_COST",
+        F.nanvl(df.FORECLOSURE_COSTS, F.lit(0)) +
+        F.nanvl(df.PROPERTY_PRESERVATION_AND_REPAIR_COSTS, F.lit(0)) +
+        F.nanvl(df.ASSET_RECOVERY_COSTS, F.lit(0)) +
+        F.nanvl(df.MISCELLANEOUS_HOLDING_EXPENSES_AND_CREDITS, F.lit(0)) +
+        F.nanvl(df.ASSOCIATED_TAXES_FOR_HOLDING_PROPERTY, F.lit(0)))
+    df = df.withColumn("TOTAL_PROCEED",
+                       F.nanvl(df.NET_SALES_PROCEEDS, F.lit(0)) +
+                       F.nanvl(df.CREDIT_ENHANCEMENT_PROCEEDS, F.lit(0)) +
+                       F.nanvl(df.REPURCHASES_MAKE_WHOLE_PROCEEDS, F.lit(0)) +
+                       F.nanvl(df.OTHER_FORECLOSURE_PROCEEDS, F.lit(0)))
+    df = df.withColumn("TOTAL_NET_LOSS",
+                       df.LAST_UPB + df.DELINQUENT_ACCRUED_INTEREST +
+                       df.TOTAL_COST - df.TOTAL_PROCEED)
 
-    total_costs = (df["FORECLOSURE_COSTS"] +
-                   df["PROPERTY_PRESERVATION_AND_REPAIR_COSTS"] +
-                   df["ASSET_RECOVERY_COSTS"] +
-                   df["MISCELLANEOUS_HOLDING_EXPENSES_AND_CREDITS"] +
-                   df["ASSOCIATED_TAXES_FOR_HOLDING_PROPERTY"])
-
-    total_proceeds = (df["NET_SALES_PROCEEDS"] +
-                      df["CREDIT_ENHANCEMENT_PROCEEDS"] +
-                      df["REPURCHASES_MAKE_WHOLE_PROCEEDS"] +
-                      df["OTHER_FORECLOSURE_PROCEEDS"])
     # Calculate LGD
-    total_net_loss = (df_new["LAST_UPB"] + delinquent_accrued_interest + total_costs - total_proceeds)
+    df = df.withColumn("LOSS_GIVEN_DEFAULT",
+                       df.TOTAL_NET_LOSS / df.LAST_UPB)
+    # Change LGD outside the boundary to endpoint values
+    df = df.withColumn(
+        "LOSS_GIVEN_DEFAULT", F.when(
+            df.LOSS_GIVEN_DEFAULT > 1, 1).when(
+            df.LOSS_GIVEN_DEFAULT < 0, 0).otherwise(df.LOSS_GIVEN_DEFAULT))
 
-    df_new['LGD'] = total_net_loss / df_new['LAST_UPB']
+    return df
 
-    return df_new
+
+def merge_output_files(filepath, destination, **kwargs):
+    """ Combine all csv files output by PySpark into one file
+
+    Parameters
+    ----------
+    filepath : str
+        The output path of PySpark
+    destination : str
+        Path object implementing a write() function
+
+    """
+
+    filenames = listdir(filepath)
+    csv_files = [filepath + '/' + filename
+                 for filename in filenames if filename.endswith('.csv')]
+    df_list = []
+    for csv_file in csv_files:
+        df_list.append(pd.read_csv(csv_file))
+    df = pd.concat(df_list)
+    df.to_csv(destination, **kwargs)
+
+    return

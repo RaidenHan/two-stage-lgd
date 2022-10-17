@@ -131,8 +131,9 @@ dmypy.json
 # PyCharm Project Files
 .idea/
 
-# Original data
+# Original data and PySpark output
 data/original_data/
+data/processed_data/
 
 # References
 ref/
