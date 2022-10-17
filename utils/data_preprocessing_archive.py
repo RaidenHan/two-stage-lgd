@@ -143,9 +143,9 @@ def find_default_data(df, disp_date=None, states=None):
     # Subset the DataFrame
     subset = df.loc[(df['Zero_Bal_Code'].isin(default_code)) &
                     (df['RE_PROCS_FLAG'] == 'N') &
-                    (df["DISPOSITION_DATE"] < disp_date), :]
+                    (df['DISPOSITION_DATE'] < disp_date), :]
     if states:
-        subset = subset.loc[subset.isin(states), :]
+        subset = subset.loc[subset['STATE'].isin(states), :]
 
     return subset
 

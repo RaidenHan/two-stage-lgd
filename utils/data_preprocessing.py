@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from datetime import date, timedelta
+
+import pyspark.sql.functions as F
 from pyspark.sql.types import *
 
 
@@ -49,7 +52,7 @@ def read_loan_csv(spark, filepath):
         StructField("DTI", ByteType(), True),
         StructField("CSCORE_B", ShortType(), True),
         StructField("CSCORE_C", ShortType(), True),
-        StructField("FIRST_FLAG", BooleanType(), True),
+        StructField("FIRST_FLAG", StringType(), True),
         StructField("PURPOSE", StringType(), True),
         StructField("PROP", StringType(), True),
         StructField("NO_UNITS", ByteType(), True),
@@ -59,13 +62,13 @@ def read_loan_csv(spark, filepath):
         StructField("ZIP", StringType(), True),
         StructField("MI_PCT", FloatType(), True),
         StructField("PRODUCT", StringType(), True),
-        StructField("PPMT_FLG", BooleanType(), True),
-        StructField("IO", BooleanType(), True),
+        StructField("PPMT_FLG", StringType(), True),
+        StructField("IO", StringType(), True),
         StructField("FIRST_PAY_IO", DateType(), True),
         StructField("MNTHS_TO_AMTZ_IO", ShortType(), True),
         StructField("DLQ_STATUS", StringType(), True),
         StructField("PMT_HISTORY", StringType(), True),
-        StructField("MOD_FLAG", BooleanType(), True),
+        StructField("MOD_FLAG", StringType(), True),
         StructField("MI_CANCEL_FLAG", StringType(), True),
         StructField("Zero_Bal_Code", StringType(), True),
         StructField("ZB_DTE", DateType(), True),
@@ -100,7 +103,7 @@ def read_loan_csv(spark, filepath):
         StructField("CURR_SCOREB", ShortType(), True),
         StructField("CURR_SCOREC", ShortType(), True),
         StructField("MI_TYPE", StringType(), True),
-        StructField("SERV_IND", BooleanType(), True),
+        StructField("SERV_IND", StringType(), True),
         StructField("CURRENT_PERIOD_MODIFICATION_LOSS_AMOUNT",
                     FloatType(), True),
         StructField("CUMULATIVE_MODIFICATION_LOSS_AMOUNT", FloatType(), True),
@@ -108,18 +111,18 @@ def read_loan_csv(spark, filepath):
                     FloatType(), True),
         StructField("CUMULATIVE_CREDIT_EVENT_NET_GAIN_OR_LOSS",
                     FloatType(), True),
-        StructField("HOMEREADY_PROGRAM_INDICATOR", BooleanType(), True),
+        StructField("HOMEREADY_PROGRAM_INDICATOR", StringType(), True),
         StructField("FORECLOSURE_PRINCIPAL_WRITE_OFF_AMOUNT",
                     FloatType(), True),
-        StructField("RELOCATION_MORTGAGE_INDICATOR", BooleanType(), True),
+        StructField("RELOCATION_MORTGAGE_INDICATOR", StringType(), True),
         StructField("ZERO_BALANCE_CODE_CHANGE_DATE", DateType(), True),
-        StructField("LOAN_HOLDBACK_INDICATOR", BooleanType(), True),
+        StructField("LOAN_HOLDBACK_INDICATOR", StringType(), True),
         StructField("LOAN_HOLDBACK_EFFECTIVE_DATE", DateType(), True),
         StructField("DELINQUENT_ACCRUED_INTEREST", FloatType(), True),
         StructField("PROPERTY_INSPECTION_WAIVER_INDICATOR",
                     StringType(), True),
-        StructField("HIGH_BALANCE_LOAN_INDICATOR", BooleanType(), True),
-        StructField("ARM_5_YR_INDICATOR", BooleanType(), True),
+        StructField("HIGH_BALANCE_LOAN_INDICATOR", StringType(), True),
+        StructField("ARM_5_YR_INDICATOR", StringType(), True),
         StructField("ARM_PRODUCT_TYPE", StringType(), True),
         StructField("MONTHS_UNTIL_FIRST_PAYMENT_RESET", ShortType(), True),
         StructField("MONTHS_BETWEEN_SUBSEQUENT_PAYMENT_RESET",
@@ -132,17 +135,109 @@ def read_loan_csv(spark, filepath):
         StructField("PERIODIC_INTEREST_RATE_CAP", FloatType(), True),
         StructField("LIFETIME_INTEREST_RATE_CAP", FloatType(), True),
         StructField("MARGIN", FloatType(), True),
-        StructField("BALLOON_INDICATOR", BooleanType(), True),
+        StructField("BALLOON_INDICATOR", StringType(), True),
         StructField("PLAN_NUMBER", StringType(), True),
         StructField("FORBEARANCE_INDICATOR", StringType(), True),
         StructField("HIGH_LOAN_TO_VALUE_HLTV_REFINANCE_OPTION_INDICATOR",
-                    BooleanType(), True),
+                    StringType(), True),
         StructField("DEAL_NAME", StringType(), True),
-        StructField("RE_PROCS_FLAG", BooleanType(), True),
+        StructField("RE_PROCS_FLAG", StringType(), True),
         StructField("ADR_TYPE", StringType(), True),
         StructField("ADR_COUNT", ShortType(), True),
         StructField("ADR_UPB", FloatType(), True)])
     df = spark.read.options(
         sep="|", dateFormat="MMyyyy").schema(schema).csv(filepath)
+
+    return df
+
+
+def find_default_data(df, disp_date=None, states=None):
+    """ Find default data without repurchase and with a disposition date before
+    a certain date
+
+    @author: Abhilash, Raiden
+
+    Parameters
+    ----------
+    df : pyspark.sql.DataFrame
+        Single family loan data from Fannie Mae
+    disp_date : str or None
+        The loan's disposition date should be no later than the disp_date. The
+        value is one year before today by default
+    states : list
+        States in the U.S. to be kept. All state data is retained by default
+
+    Returns
+    -------
+    subset : DataFrame
+        Filtered loan data
+
+    """
+
+    # Set disp_date's default value
+    if disp_date is None:
+        today = date.today()
+        disp_date = today - timedelta(days=365)
+        disp_date = disp_date.strftime('%Y-%m-%d')
+    # Set states' default value
+    if states is None:
+        states = []
+    # Set a list for default loans' zero balance codes
+    default_code = ['02', '03', '09']
+    # Subset the DataFrame
+    subset = df.filter(df.Zero_Bal_Code.isin(default_code) &
+                       (df.RE_PROCS_FLAG == 'N') &
+                       (df.DISPOSITION_DATE < disp_date))
+    if states:
+        subset = subset.filter(subset.STATE.isin(states))
+
+    return subset
+
+
+def calculate_lgd(df):
+    """ Calculate loss given default
+
+    @author: Abhilash, Catherine, Raiden
+
+    Parameters
+    ----------
+    df : pyspark.sql.DataFrame
+        Single family loan data from Fannie Mae
+
+    Returns
+    -------
+    df : pyspark.sql.DataFrame
+        Single family loan data from Fannie Mae with loss given default
+
+    """
+
+    # Calculate total costs and total proceeds
+    df = df.withColumn(
+        "DELINQUENT_ACCRUED_INTEREST",
+        df.LAST_UPB * ((df.ORIG_RATE / 100 - 0.0035) / 12) * F.months_between(
+            df.DISPOSITION_DATE, df.ACT_PERIOD))
+    df = df.withColumn(
+        "TOTAL_COST",
+        F.nanvl(df.FORECLOSURE_COSTS, F.lit(0)) +
+        F.nanvl(df.PROPERTY_PRESERVATION_AND_REPAIR_COSTS, F.lit(0)) +
+        F.nanvl(df.ASSET_RECOVERY_COSTS, F.lit(0)) +
+        F.nanvl(df.MISCELLANEOUS_HOLDING_EXPENSES_AND_CREDITS, F.lit(0)) +
+        F.nanvl(df.ASSOCIATED_TAXES_FOR_HOLDING_PROPERTY, F.lit(0)))
+    df = df.withColumn("TOTAL_PROCEED",
+                       F.nanvl(df.NET_SALES_PROCEEDS, F.lit(0)) +
+                       F.nanvl(df.CREDIT_ENHANCEMENT_PROCEEDS, F.lit(0)) +
+                       F.nanvl(df.REPURCHASES_MAKE_WHOLE_PROCEEDS, F.lit(0)) +
+                       F.nanvl(df.OTHER_FORECLOSURE_PROCEEDS, F.lit(0)))
+    df = df.withColumn("TOTAL_NET_LOSS",
+                       df.LAST_UPB + df.DELINQUENT_ACCRUED_INTEREST +
+                       df.TOTAL_COST - df.TOTAL_PROCEED)
+    # Calculate LGD
+    df = df.withColumn("LOSS_GIVEN_DEFAULT",
+                       df.TOTAL_NET_LOSS / df.LAST_UPB)
+    # Change LGD outside the boundary to endpoint values
+    df = df.withColumn(
+        "LOSS_GIVEN_DEFAULT", F.when(
+            df.LOSS_GIVEN_DEFAULT > 1, 1).when(
+            df.LOSS_GIVEN_DEFAULT < 0, 0).otherwise(df.LOSS_GIVEN_DEFAULT))
 
     return df
