@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 
 from datetime import date, timedelta
+from functools import reduce
+from operator import add
 from os import listdir
 
 import pandas as pd
@@ -213,23 +215,26 @@ def calculate_lgd(df):
 
     """
 
+    # Define lists of costs and proceeds
+    costs_val = ["FORECLOSURE_COSTS", "PROPERTY_PRESERVATION_AND_REPAIR_COSTS",
+                 "ASSET_RECOVERY_COSTS",
+                 "MISCELLANEOUS_HOLDING_EXPENSES_AND_CREDITS",
+                 "ASSOCIATED_TAXES_FOR_HOLDING_PROPERTY"]
+    proceeds_val = ["NET_SALES_PROCEEDS", "CREDIT_ENHANCEMENT_PROCEEDS",
+                    "REPURCHASES_MAKE_WHOLE_PROCEEDS",
+                    "OTHER_FORECLOSURE_PROCEEDS"]
+    # Fill null values in the costs and proceeds with 0
+    df = df.na.fill(value=0, subset=costs_val + proceeds_val)
     # Calculate total costs and total proceeds
     df = df.withColumn(
         "DELINQUENT_ACCRUED_INTEREST",
         df.LAST_UPB * ((df.ORIG_RATE / 100 - 0.0035) / 12) * F.months_between(
             df.DISPOSITION_DATE, df.ACT_PERIOD))
     df = df.withColumn(
-        "TOTAL_COST",
-        F.nanvl(df.FORECLOSURE_COSTS, F.lit(0)) +
-        F.nanvl(df.PROPERTY_PRESERVATION_AND_REPAIR_COSTS, F.lit(0)) +
-        F.nanvl(df.ASSET_RECOVERY_COSTS, F.lit(0)) +
-        F.nanvl(df.MISCELLANEOUS_HOLDING_EXPENSES_AND_CREDITS, F.lit(0)) +
-        F.nanvl(df.ASSOCIATED_TAXES_FOR_HOLDING_PROPERTY, F.lit(0)))
-    df = df.withColumn("TOTAL_PROCEED",
-                       F.nanvl(df.NET_SALES_PROCEEDS, F.lit(0)) +
-                       F.nanvl(df.CREDIT_ENHANCEMENT_PROCEEDS, F.lit(0)) +
-                       F.nanvl(df.REPURCHASES_MAKE_WHOLE_PROCEEDS, F.lit(0)) +
-                       F.nanvl(df.OTHER_FORECLOSURE_PROCEEDS, F.lit(0)))
+        "TOTAL_COST", reduce(add, [F.col(cost) for cost in costs_val]))
+    df = df.withColumn(
+        "TOTAL_PROCEED", reduce(
+            add, [F.col(proceed) for proceed in proceeds_val]))
     df = df.withColumn("TOTAL_NET_LOSS",
                        df.LAST_UPB + df.DELINQUENT_ACCRUED_INTEREST +
                        df.TOTAL_COST - df.TOTAL_PROCEED)
