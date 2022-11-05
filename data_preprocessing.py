@@ -35,7 +35,10 @@ def main():
     default_data = find_default_data(dataset, states=states)
     default_data = calculate_lgd(default_data)
     # Keep and store primary features and the response variable
-    subset = default_data.select(features + ['LOSS_GIVEN_DEFAULT'])
+    if features:
+        subset = default_data.select(features + ['LOSS_GIVEN_DEFAULT'])
+    else:
+        subset = default_data
     subset.write.csv(destination, header=True, mode='overwrite')
 
     # Close the PySpark session
