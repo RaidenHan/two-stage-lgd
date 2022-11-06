@@ -7,6 +7,7 @@ from operator import add
 from os import listdir
 
 import pandas as pd
+import pandas_datareader.data as web
 import pyspark.sql.functions as F
 from pyspark.sql.types import *
 
@@ -276,5 +277,37 @@ def merge_output_files(filepath, destination, **kwargs):
         df_list.append(pd.read_csv(csv_file))
     df = pd.concat(df_list)
     df.to_csv(destination, **kwargs)
+
+    return df
+
+
+def get_fred_data(symbols,
+                  start='2000-01-01', end=date.today().strftime('%Y-%m-%d')):
+    """ Get monthly data for the given name from the St. Louis FED (FRED).
+    Return all data from 2000 to the present by default. Null values will be
+    filled using linear interpolation.
+
+    Parameters
+    ----------
+    symbols : list
+        FRED symbols
+    start : str
+        Start date of the data
+    end : str
+        End date of the data
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        FRED data
+    """
+
+    symbol_list = []
+    for symbol in symbols:
+        s = web.DataReader(symbol, 'fred', start, end)
+        s = s.resample('MS').first()
+        symbol_list.append(s)
+    df = pd.concat(symbol_list, axis=1)
+    df = df.interpolate()
 
     return df
