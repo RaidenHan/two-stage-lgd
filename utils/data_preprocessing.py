@@ -261,6 +261,11 @@ def merge_output_files(filepath, destination, **kwargs):
     destination : str
         Path object implementing a write() function
 
+    Returns
+    -------
+    df : pandas.DataFrame
+        Single family loan data from Fannie Mae with loss given default
+
     """
 
     filenames = listdir(filepath)
@@ -272,4 +277,4 @@ def merge_output_files(filepath, destination, **kwargs):
     df = pd.concat(df_list)
     df.to_csv(destination, **kwargs)
 
-    return
+    return df
