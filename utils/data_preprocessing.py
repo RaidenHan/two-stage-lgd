@@ -341,8 +341,11 @@ def merge_drop_features(loan_features, macro_features, drop_list):
         columns={'CURR_HPI': 'ORIG_HPI'}), how='left',
                   left_on='ORIG_DATE', right_index=True)
     # Calculate mark-to-market LTV
-    df["MTM_LTV"] = (df["LAST_UPB"] / ((df["ORIG_UPB"] / df["OLTV"]) * (
-            df["CURR_HPI"] / df["ORIG_HPI"])))
+    df['MTM_LTV'] = (df['LAST_UPB'] / ((df['ORIG_UPB'] / df['OLTV']) * (
+            df['CURR_HPI'] / df['ORIG_HPI'])))
+    # Calculate the difference between the original interest rate and the
+    # current mortgage rate
+    df['INT_DIFF'] = df['ORIG_RATE'] - df['MORTGAGE30US']
     df = df.drop(drop_list, axis=1)
 
     return df
