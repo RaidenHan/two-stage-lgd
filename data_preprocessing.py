@@ -46,7 +46,7 @@ def main():
     spark.stop()
 
     # Merge all output files
-    loan_output = merge_output_files(destination, "data/processed_dataset.csv")
+    loan_output = merge_output_files(destination, "data/extracted_loan.csv")
     loan_output[['ORIG_DATE', 'LAST_PAID_INSTALLMENT_DATE']] = loan_output[[
         'ORIG_DATE', 'LAST_PAID_INSTALLMENT_DATE']].apply(pd.to_datetime)
     # Get macroeconomic variables
