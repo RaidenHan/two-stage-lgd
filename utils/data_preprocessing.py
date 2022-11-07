@@ -283,9 +283,9 @@ def merge_output_files(filepath, destination, **kwargs):
 
 
 def get_fred_data(symbols,
-                  start='2000-01-01', end=date.today().strftime('%Y-%m-%d')):
+                  start='1976-01-01', end=date.today().strftime('%Y-%m-%d')):
     """ Get monthly data for the given name from the St. Louis FED (FRED).
-    Return all data from 2000 to the present by default. Null values will be
+    Return all data from 1976 to the present by default. Null values will be
     filled using linear interpolation.
 
     Parameters
