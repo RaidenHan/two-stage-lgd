@@ -311,3 +311,38 @@ def get_fred_data(symbols,
     df = df.interpolate()
 
     return df
+
+
+def merge_drop_features(loan_features, macro_features, drop_list):
+    """ Merge the loan feature set and the macroeconomic feature set, calculate
+    mark-to-market LTV and difference between interest rates, and drop
+    selected features
+
+    Parameters
+    ----------
+    loan_features : pandas.DataFrame
+        Loan feature set
+    macro_features : pandas.DataFrame
+        Macroeconomic feature set
+    drop_list : list
+        Features to be dropped
+
+    Returns
+    -------
+    df : pandas.DataFrame
+       Primary feature set
+
+    """
+
+    # Merge the datasets
+    df = pd.merge(loan_features, macro_features, how='left',
+                  left_on='LAST_PAID_INSTALLMENT_DATE', right_index=True)
+    df = pd.merge(df, macro_features[['CURR_HPI']].rename(
+        columns={'CURR_HPI': 'ORIG_HPI'}), how='left',
+                  left_on='ORIG_DATE', right_index=True)
+    # Calculate mark-to-market LTV
+    df["MTM_LTV"] = (df["LAST_UPB"] / ((df["ORIG_UPB"] / df["OLTV"]) * (
+            df["CURR_HPI"] / df["ORIG_HPI"])))
+    df = df.drop(drop_list, axis=1)
+
+    return df
