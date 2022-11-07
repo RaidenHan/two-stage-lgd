@@ -276,6 +276,7 @@ def merge_output_files(filepath, destination, **kwargs):
     for csv_file in csv_files:
         df_list.append(pd.read_csv(csv_file))
     df = pd.concat(df_list)
+    df = df.reset_index(drop=True)
     df.to_csv(destination, **kwargs)
 
     return df
