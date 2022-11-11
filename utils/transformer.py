@@ -1,8 +1,30 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import numpy as np
 import pandas as pd
 from scipy.stats import beta, norm
+from statsmodels.distributions.empirical_distribution import ECDF
+
+
+def logit_transformer(s):
+    """ Transform the variable using the fractional logit model
+
+    Parameters
+    ----------
+    s : pandas.Series
+        Variable's value
+
+    Returns
+    -------
+    s_logit : pandas.Series
+        Transformed variable's value
+
+    """
+
+    s_logit = np.log(s) - np.log(1 - s)
+
+    return s_logit
 
 
 def beta_transformer(s):
@@ -30,3 +52,24 @@ def beta_transformer(s):
     s_norm = pd.Series(s_norm, name=s.name)
 
     return s_norm, a, b
+
+
+def probit_transformer(s):
+    """ Transform the variable using the Probit transformation
+
+    Parameters
+    ----------
+    s : pandas.Series
+        Variable's value
+
+    Returns
+    -------
+    s_probit : pandas.Series
+        Transformed variable's value
+
+    """
+
+    ecdf = ECDF(s)
+    s_probit = pd.Series(ecdf(s), name=s.name)
+
+    return s_probit
