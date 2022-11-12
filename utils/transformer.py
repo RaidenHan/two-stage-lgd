@@ -70,6 +70,6 @@ def probit_transformer(s):
     """
 
     ecdf = ECDF(s)
-    s_probit = pd.Series(ecdf(s), name=s.name)
+    s_probit = pd.Series(norm.ppf(ecdf(s)), name=s.name)
 
     return s_probit
