@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import numpy as np
-import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from utils.model import *
@@ -34,8 +32,8 @@ def main():
     # Predict for the LGD = 0 case
     logistic_0 = logistic_regression(
         X_train, y_train, label=0, c_grid=np.linspace(0.24, 0.26, 21))
-    # svc_0 = linear_svc(
-    #     X_train, y_train, label=0, c_grid=np.linspace(0.1, 0.5, 21))
+    svc_0 = linear_svc(
+        X_train, y_train, label=0, c_grid=np.linspace(0.18, 0.22, 21))
     # random_forest_0 = random_forest_clf(
     #     X_train, y_train, label=0,
     #     depth_grid=range(5, 10), min_split_grid=range(20, 31, 2))
