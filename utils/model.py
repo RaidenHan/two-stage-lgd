@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from functools import reduce
-
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from joblib import dump
 from sklearn.ensemble import RandomForestClassifier
@@ -72,7 +71,7 @@ def save_model_performance(model, prefix, X_test, y_test):
 def logistic_regression(X_train, y_train, label, c_grid):
     """ Fit a logistic regression model to predict a certain label in the
     response variable with l2 penalty and 5-fold cross-validation. The function
-    will use AUC to choose the optimal hyper-parameters.
+    will use AUC to choose the optimal hyperparameter.
 
     Parameters
     ----------
@@ -92,7 +91,7 @@ def logistic_regression(X_train, y_train, label, c_grid):
 
     """
 
-    y_train = y_train == label
+    y_train_class = y_train == label
     scaler = StandardScaler()
     logistic = LogisticRegression(max_iter=10000, random_state=1104)
     pipe = Pipeline([('scaler', scaler), ('logistic', logistic)])
@@ -100,15 +99,15 @@ def logistic_regression(X_train, y_train, label, c_grid):
     search = GridSearchCV(
         pipe, param_grid, scoring=['roc_auc', 'accuracy'],
         refit='roc_auc', return_train_score=True)
-    search.fit(X_train, y_train)
+    search.fit(X_train, y_train_class)
 
     return search
 
 
 def linear_svc(X_train, y_train, label, c_grid):
-    """ Fit a linear support vector classifier to predict a certain label in the
-    response variable with l2 penalty and 5-fold cross-validation. The function
-    will use AUC to choose the optimal hyper-parameters.
+    """ Fit a linear support vector classifier to predict a certain label in
+    the response variable with l2 penalty and 5-fold cross-validation. The
+    function will use AUC to choose the optimal hyperparameter.
 
     Parameters
     ----------
@@ -128,14 +127,15 @@ def linear_svc(X_train, y_train, label, c_grid):
 
     """
 
-    y_train = y_train == label
+    y_train_class = y_train == label
     scaler = StandardScaler()
-    svc = LinearSVC(class_weight='balanced', random_state=1104)
+    svc = LinearSVC(
+        class_weight='balanced', random_state=1104, max_iter=100000)
     pipe = Pipeline([('scaler', scaler), ('svc', svc)])
     param_grid = {'svc__C': c_grid}
     search = GridSearchCV(pipe, param_grid, scoring=['roc_auc', 'accuracy'],
-        refit='roc_auc', return_train_score=True)
-    search.fit(X_train, y_train)
+                          refit='roc_auc', return_train_score=True)
+    search.fit(X_train, y_train_class)
 
     return search
 
@@ -143,7 +143,7 @@ def linear_svc(X_train, y_train, label, c_grid):
 def random_forest_clf(X_train, y_train, label, depth_grid, min_split_grid):
     """ Fit a random forest classifier to predict a certain label in the
     response variable with l2 penalty and 5-fold cross-validation. The function
-    will use AUC to choose the optimal hyper-parameters.
+    will use AUC to choose the optimal hyperparameter.
 
     Parameters
     ----------
@@ -165,14 +165,45 @@ def random_forest_clf(X_train, y_train, label, depth_grid, min_split_grid):
 
     """
 
-    y_train = y_train == label
+    y_train_class = y_train == label
     scaler = StandardScaler()
     rf_clf = RandomForestClassifier(n_estimators=500, random_state=1104)
     pipe = Pipeline([('scaler', scaler), ('random_forest', rf_clf)])
     param_grid = {'random_forest__max_depth': depth_grid,
                   'random_forest__min_samples_split': min_split_grid}
     search = GridSearchCV(pipe, param_grid, scoring=['roc_auc', 'accuracy'],
-        refit='roc_auc', return_train_score=True)
-    search.fit(X_train, y_train)
+                          refit='roc_auc', return_train_score=True)
+    search.fit(X_train, y_train_class)
 
     return search
+
+
+def choose_best_model(model_list, param_metric, metric):
+    """ Given a set of models, compare the metric corresponding to the optimal
+    hyperparameter measured by their param_metric, and select the optimal
+    model.
+
+    Parameters
+    ----------
+    model_list : list
+        List of machine learning models with cross-validation results
+    param_metric : str
+        Metric for selecting hyperparameters
+    metric : str
+        Metric for selecting the optimal model
+
+    Returns
+    -------
+    model : sklearn.model_selection._search.GridSearchCV
+        Optimal model
+
+    """
+
+    scores = []
+    for model in model_list:
+        scores.append(
+            model.cv_results_[f'mean_test_{metric}'][
+                np.argmax(model.cv_results_[f'mean_test_{param_metric}'])])
+    model = model_list[np.argmax(scores)]
+
+    return model
