@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from utils.model import *
@@ -52,6 +52,29 @@ def main():
         float).replace(0, np.nan).replace(1, 0))
     X_test_resid, y_test_resid = (
         X_test_resid.loc[~c0_pred, :], y_test_resid[~c0_pred])
+
+    # Regression
+    train_reg_idx = y_train[(y_train > 0) & (y_train < 1)].index
+    X_train_reg = X_train.loc[train_reg_idx, :]
+    y_train_reg = y_train.loc[train_reg_idx]
+    linear = linear_regression(X_train_reg, y_train_reg)
+    gb_reg = gradient_boosting(
+        X_train_reg, y_train_reg,
+        max_depth_grid=range(8, 13), min_sample_grid=range(70, 81, 2))
+    # Save the models and choose the optimal model
+    reg_models = [linear, gb_reg]
+    for reg_model in reg_models:
+        save_model_performance(reg_model, 'reg', X_test_resid, y_test_resid)
+    reg_model = choose_best_model(reg_models, 'score', 'score')
+    # Finish the prediction
+    y_pred = y_pred.fillna(pd.Series(
+        reg_model.predict(X_test_resid),
+        index=y_test_resid.index, name=y_test_resid.name))
+    # Save the overall scores
+    model_score = pd.Series({'MAE': mean_absolute_error(y_test, y_pred),
+                             'RMSE': np.sqrt(mean_squared_error(
+                                 y_test, y_pred))}, name='Score')
+    model_score.to_csv("model/final_score.csv")
 
     return
 

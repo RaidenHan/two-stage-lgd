@@ -5,13 +5,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from joblib import dump
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import ConfusionMatrixDisplay, classification_report
+from sklearn.ensemble import RandomForestClassifier, \
+    HistGradientBoostingRegressor
+from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.metrics import ConfusionMatrixDisplay, classification_report, \
+    mean_absolute_error, mean_squared_error
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
+from sklearn.compose import TransformedTargetRegressor
+
+from utils.transformer import *
 
 
 def save_model_performance(model, prefix, X_test, y_test):
@@ -25,7 +30,7 @@ def save_model_performance(model, prefix, X_test, y_test):
         Prefix of the files
     X_test : pandas.DataFrame
         Test features
-    y_test : pandas.DataFrame
+    y_test : pandas.Series
         Test response variable
 
     """
@@ -65,6 +70,22 @@ def save_model_performance(model, prefix, X_test, y_test):
                 y_test, y_pred, output_dict=True, zero_division=0))
         report.to_csv(f"model/{label}_report.csv")
 
+    elif est_name in ['linear', 'boosting']:
+        if est_name == 'linear':
+            # Save the model coefficient
+            coef = pd.Series(dict(zip(
+                X_test.columns,
+                model.best_estimator_[est_name].regressor_.coef_)),
+                name=label)
+            coef.to_csv(f'model/{label}_coef.csv')
+
+        # Save the statistics
+        y_pred = model.predict(X_test)
+        result = pd.Series({'MAE': mean_absolute_error(y_test, y_pred),
+                            'RMSE': np.sqrt(mean_squared_error(
+                                y_test, y_pred))}, name=label)
+        result.to_csv(f"model/{label}_result.csv")
+
     return
 
 
@@ -77,7 +98,7 @@ def logistic_regression(X_train, y_train, label, c_grid):
     ----------
     X_train : pandas.DataFrame
         Features
-    y_train : pandas.DataFrame
+    y_train : pandas.Series
         Original response variable
     label : float
         Positive class value
@@ -113,7 +134,7 @@ def linear_svc(X_train, y_train, label, c_grid):
     ----------
     X_train : pandas.DataFrame
         Features
-    y_train : pandas.DataFrame
+    y_train : pandas.Series
         Original response variable
     label : float
         Positive class value
@@ -149,7 +170,7 @@ def random_forest_clf(X_train, y_train, label, depth_grid, min_split_grid):
     ----------
     X_train : pandas.DataFrame
         Features
-    y_train : pandas.DataFrame
+    y_train : pandas.Series
         Original response variable
     label : float
         Positive class value
@@ -207,3 +228,75 @@ def choose_best_model(model_list, param_metric, metric):
     model = model_list[np.argmax(scores)]
 
     return model
+
+
+def linear_regression(X_train, y_train):
+    """ Fit a linear model with 5-fold cross-validation. The function will
+    choose the model with the minimum MAE.
+
+    Parameters
+    ----------
+    X_train : pandas.DataFrame
+        Features
+    y_train : pandas.Series
+        Original response variable
+
+    Returns
+    -------
+    search : sklearn.model_selection._search.GridSearchCV
+        Optimal linear regression model
+
+    """
+
+    scaler = StandardScaler()
+    transformers = [logit_transformer(), beta_transformer(y_train),
+                    probit_transformer(y_train)]
+    lr = LinearRegression()
+    regr = TransformedTargetRegressor(lr, check_inverse=False)
+    pipe = Pipeline([('scaler', scaler), ('linear', regr)])
+    param_grid = {'linear__transformer': transformers}
+    search = GridSearchCV(pipe, param_grid, scoring='neg_mean_absolute_error',
+                          return_train_score=True)
+    search.fit(X_train, y_train)
+
+    return search
+
+
+def gradient_boosting(X_train, y_train, max_depth_grid, min_sample_grid):
+    """ Fit a gradient boosting regression tree with 5-fold cross-validation.
+    The function will choose the model with the minimum MAE.
+
+    Parameters
+    ----------
+    X_train : pandas.DataFrame
+        Features
+    y_train : pandas.Series
+        Original response variable
+    max_depth_grid : array-like
+        Maximum depth of the tree
+    min_sample_grid : array-like
+        Minimum number of samples per leaf
+
+    Returns
+    -------
+    search : sklearn.model_selection._search.GridSearchCV
+        Optimal linear regression model
+
+    """
+
+    scaler = StandardScaler()
+    transformers = [logit_transformer(), beta_transformer(y_train),
+                    probit_transformer(y_train)]
+    gbr = HistGradientBoostingRegressor(
+        loss='absolute_error', learning_rate=0.02, max_iter=500,
+        early_stopping=True, random_state=1104)
+    regr = TransformedTargetRegressor(gbr, check_inverse=False)
+    pipe = Pipeline([('scaler', scaler), ('boosting', regr)])
+    param_grid = {'boosting__transformer': transformers,
+                  'boosting__regressor__max_depth': max_depth_grid,
+                  'boosting__regressor__min_samples_leaf': min_sample_grid}
+    search = GridSearchCV(pipe, param_grid, scoring='neg_mean_absolute_error',
+                          return_train_score=True)
+    search.fit(X_train, y_train)
+
+    return search

@@ -2,29 +2,39 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-import pandas as pd
 from scipy.stats import beta, norm
-from statsmodels.distributions.empirical_distribution import ECDF
+from sklearn.preprocessing import FunctionTransformer
 
 
-def logit_transformer(s):
+def logit_func(x):
+    return np.log(x) - np.log(1 - x)
+
+
+def logit_func_inv(x):
+    return np.exp(x) / (np.exp(x) + 1)
+
+
+def logit_transformer():
     """ Transform the variable using the fractional logit model
-
-    Parameters
-    ----------
-    s : pandas.Series
-        Variable's value
 
     Returns
     -------
-    s_logit : pandas.Series
-        Transformed variable's value
+    transformer : sklearn.preprocessing.FunctionTransformer
 
     """
 
-    s_logit = np.log(s) - np.log(1 - s)
+    transformer = FunctionTransformer(
+        logit_func, logit_func_inv, check_inverse=False)
 
-    return s_logit
+    return transformer
+
+
+def beta_func(x, a, b):
+    return norm.pdf(beta.cdf(x, a, b))
+
+
+def beta_func_inv(x, a, b):
+    return beta.ppf(norm.cdf(x), a, b)
 
 
 def beta_transformer(s):
@@ -34,24 +44,30 @@ def beta_transformer(s):
     Parameters
     ----------
     s : pandas.Series
-        Variable's value
+        Variable's value in the training set
 
     Returns
     -------
-    s_norm : pandas.Series
-        Transformed variable's value
-    a : float
-        Fitted Beta distribution's loc parameter
-    b : float
-        Fitted Beta distribution's scale parameter
+    transformer : sklearn.preprocessing.FunctionTransformer
 
     """
 
     a, b, *_ = beta.fit(s, floc=0, fscale=1)
-    s_norm = norm.ppf(beta.cdf(s, a, b))
-    s_norm = pd.Series(s_norm, name=s.name)
+    params = {'a': a, 'b': b}
+    transformer = FunctionTransformer(
+        beta_func, beta_func_inv, check_inverse=False,
+        kw_args=params, inv_kw_args=params)
 
-    return s_norm, a, b
+    return transformer
+
+
+def probit_func(x, s):
+    n = s.shape[0] + 2
+    return norm.ppf((np.argsort(np.argsort(x)) + 1) / n)
+
+
+def probit_func_inv(x, s):
+    return np.quantile(s, norm.cdf(x))
 
 
 def probit_transformer(s):
@@ -60,16 +76,17 @@ def probit_transformer(s):
     Parameters
     ----------
     s : pandas.Series
-        Variable's value
+        Variable's value in the training set
 
     Returns
     -------
-    s_probit : pandas.Series
-        Transformed variable's value
+    transformer : sklearn.preprocessing.FunctionTransformer
 
     """
 
-    ecdf = ECDF(s)
-    s_probit = pd.Series(norm.ppf(ecdf(s)), name=s.name)
+    params = {'s': s}
+    transformer = FunctionTransformer(
+        probit_func, probit_func_inv, check_inverse=False,
+        kw_args=params, inv_kw_args=params)
 
-    return s_probit
+    return transformer
