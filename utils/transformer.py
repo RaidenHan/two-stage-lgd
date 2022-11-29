@@ -30,7 +30,7 @@ def logit_transformer():
 
 
 def beta_func(x, a, b):
-    return norm.pdf(beta.cdf(x, a, b))
+    return norm.ppf(beta.cdf(x, a, b))
 
 
 def beta_func_inv(x, a, b):
