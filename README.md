@@ -24,3 +24,9 @@ In addition to the packages in requirements.txt, the project relies on PySpark t
   - fig: Figures about feature distributions and relationships.
   - model: Used machine learning models and their performances on the test set.
   - utils: Other functions.
+
+## References
+
+1. Bellotti, Tony, and Jonathan Crook. "Loss given default models incorporating macroeconomic variables for credit cards." International Journal of Forecasting 28.1 (2012): 171-182.
+2. "Loss Data Analysis Tutorial 101." Loss Data Analysis Tutorial 101 - Capital Markets, 27 Jul. 2015, capitalmarkets.fanniemae.com/media/871/display.
+3. "Single-Family Loan Performance Dataset and Credit Risk Transfer - Glossary and File Layout." Glossary and File Layout - Capital Markets - Fannie Mae, 31 Oct. 2022, capitalmarkets.fanniemae.com/media/6931/display.
