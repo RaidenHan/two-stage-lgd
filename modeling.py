@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# import all packages needed
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from utils.model import *
 
-
+# The main function
 def main():
     df = pd.read_csv("data/final_dataset.csv", index_col=0)
     X_train, X_test, y_train, y_test = train_test_split(
